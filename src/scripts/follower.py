@@ -9,23 +9,24 @@ import numpy as np
 
 # Constants.
 FREQUENCY = 10 #Hz.
-VELOCITY = 0 #m/s
-ANGULARZ = 0
 DURATION = 5 #s how long the message should be published.
 
-KP = 2
-roll = pitch = yaw = 0.0
-
-ROTATE_POSITION = [0,0,0]
-PIPELINE = ["R90", "T2", "R-22.5", "T1.53073372946", "R-90","T2.82842712475", "R-157.5", "T1.53073372946", "R90", "T2"]
-CURRENT_POSITION = [0,0,0]
-
+#color extraction
 light_red = (0, 0, 255)
 dark_red = (0, 0, 200)
-AREA_STANDARD = 14000
-V_CONSTANT = 0.00001
+
+#area reference
+AREA_STANDARD = 4500
+
+#constant to make fit speed and angular speed
+V_CONSTANT = 0.0001
 W_CONSTANT = 0.001
 
+#area and center point
+area = 0 
+center = 0
+
+#image size of camera view
 image_width = 640
 image_height = 480
 
@@ -61,15 +62,16 @@ class Follower:
 		(rows,cols,channels) = cv_image.shape
 		blue,green,red = cv2.split(cv_image)
 		_,output = cv2.threshold(red, 250, 255, cv2.THRESH_BINARY)
-		print(output.shape)
+
 		_,cnts, _ = cv2.findContours(output.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 		#cv2.drawContours(cv_image, cnts, -1, (0, 255, 255), 5)
-	
-		area,center = self.get_max_cnt_area(cnts)
+		
+		global area, center
+		area, center = self.get_max_cnt_area(cnts)
 		#cv2.circle(cv_image, center, 10, (255,255,0), 10)
-		if area != 0 and center != 0:
-			global VELOCITY, ANGULARZ
-			VELOCITY, ANGULARZ = self.computeVW(area,center)
+		#if area != 0 and center != 0:
+		#	global VELOCITY, ANGULARZ
+		#	VELOCITY, ANGULARZ = self.computeVW(area,center)
 			
 		cv2.imshow("reference", cv_image)
 		cv2.imshow("output", output)
@@ -78,8 +80,12 @@ class Follower:
 	
 	def computeVW (self, area, center):
 		V = (area - AREA_STANDARD) * (-1)* V_CONSTANT
-		W = (center[0] - image_width/2) * W_CONSTANT
-		return V, W
+		W = (center[0] - image_width/2) *(-1) * W_CONSTANT
+		print("area:", area)
+		print("center:", center[0])
+		print("velocity:", V)
+		print("angular speed", W)
+		return V , W
 		
 	def get_max_cnt_area(self, cnts):
 		try:
@@ -101,12 +107,13 @@ class Follower:
 		rate = rospy.Rate(FREQUENCY)
 		start_time = rospy.get_rostime()
 		vel_msg = Twist()
-
+		
 		while not rospy.is_shutdown():
-			print(VELOCITY,ANGULARZ)
-			vel_msg.linear.x = VELOCITY
-			vel_msg.angular.z = ANGULARZ
-			self.publisher.publish(vel_msg)
+			if area !=0 and center !=0:
+				VELOCITY, ANGULARZ = self.computeVW(area,center)
+				vel_msg.linear.x = VELOCITY
+				vel_msg.angular.z = ANGULARZ
+				self.publisher.publish(vel_msg)
 			rate.sleep()
 
 if __name__ == "__main__":
