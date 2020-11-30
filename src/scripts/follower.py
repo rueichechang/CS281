@@ -4,6 +4,10 @@ from geometry_msgs.msg import Twist # message type for velocity command.
 from sensor_msgs.msg import LaserScan, CameraInfo, Image # message type for laser measurement.
 from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
+
+from gazebo_msgs.msg import ModelState
+from gazebo_msgs.srv import SetModelState
+
 import rospy,math,cv2 # module for ROS APIs
 import numpy as np
 
@@ -11,16 +15,12 @@ import numpy as np
 FREQUENCY = 10 #Hz.
 DURATION = 5 #s how long the message should be published.
 
-#color extraction
-light_red = (0, 0, 255)
-dark_red = (0, 0, 200)
-
 #area reference
-AREA_STANDARD = 4500
+AREA_STANDARD = 8000
 
 #constant to make fit speed and angular speed
 V_CONSTANT = 0.0001
-W_CONSTANT = 0.001
+W_CONSTANT = 0.008
 
 #area and center point
 area = 0 
@@ -60,7 +60,7 @@ class Follower:
 			print(e)
 		
 		(rows,cols,channels) = cv_image.shape
-		blue,green,red = cv2.split(cv_image)
+		blue, green, red = cv2.split(cv_image)
 		_,output = cv2.threshold(red, 250, 255, cv2.THRESH_BINARY)
 
 		_,cnts, _ = cv2.findContours(output.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -79,6 +79,8 @@ class Follower:
 		cv2.waitKey(3)
 	
 	def computeVW (self, area, center):
+		if area ==0 and center ==0:
+			return 0,0
 		V = (area - AREA_STANDARD) * (-1)* V_CONSTANT
 		W = (center[0] - image_width/2) *(-1) * W_CONSTANT
 		print("area:", area)
